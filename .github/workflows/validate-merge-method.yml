@@ -1,0 +1,44 @@
+name: Validate Merge Method
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches:
+      - 'release-202502'
+      - 'main'
+
+jobs:
+  validate-merge-method:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Validate merge method based on branch pattern
+        shell: bash
+        run: |
+          # プルリクエスト情報の取得
+          SOURCE_BRANCH="${{ github.head_ref }}"
+          TARGET_BRANCH="${{ github.base_ref }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          
+          echo "Validating merge method for PR #$PR_NUMBER from $SOURCE_BRANCH to $TARGET_BRANCH"
+          
+          # ブランチパターンに基づく検証ルール設定
+          if [[ "$SOURCE_BRANCH" == feat-* && "$TARGET_BRANCH" == release-* ]]; then
+            REQUIRED_METHOD="merge"
+            echo "::warning::このPRは feat- から release- へのため、マージコミットのみ使用してください"
+          elif [[ "$SOURCE_BRANCH" == feat/* && "$TARGET_BRANCH" == release-* ]]; then
+            REQUIRED_METHOD="squash"
+            echo "::warning::このPRは feat/ から release- へのため、スカッシュマージのみ使用してください"
+          elif [[ "$TARGET_BRANCH" == main ]]; then
+            REQUIRED_METHOD="merge"
+            echo "::warning::mainブランチへのPRはマージコミットのみ使用してください"
+          else
+            echo "このブランチの組み合わせには特定のマージ方法の制約はありません"
+            exit 0
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
